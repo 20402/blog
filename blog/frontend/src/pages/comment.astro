@@ -1,0 +1,65 @@
+---
+import MainGridLayout from "../layouts/MainGridLayout.astro";
+import Markdown from "@components/misc/Markdown.astro";
+import { getEntry, render } from "astro:content";
+
+const commentPost = await getEntry("spec", "comment");
+
+if (!commentPost) {
+	throw new Error("Comment page content not found");
+}
+
+const { Content } = await render(commentPost);
+---
+
+<MainGridLayout title="留言" description="留言">
+    <div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
+        <div class="card-base z-10 px-9 py-6 relative w-full ">
+            <Markdown class="mt-2">
+                <Content />
+            </Markdown>
+            <!-- 自建评论组件 -->
+            <div id="comment-app" class="mt-8">
+                <div id="comment-list" class="space-y-4"></div>
+                <div id="comment-form" class="mt-6 p-4 rounded-xl bg-[var(--card-bg)]">
+                    <h3 class="text-lg font-bold mb-3">发表评论</h3>
+                    <input id="comment-name" type="text" placeholder="你的名字" class="w-full px-3 py-2 rounded-lg mb-2 border border-[var(--border)] bg-[var(--input-bg)]" />
+                    <textarea id="comment-content" placeholder="写下你想说的……" class="w-full px-3 py-2 rounded-lg mb-2 border border-[var(--border)] bg-[var(--input-bg)] min-h-[100px]"></textarea>
+                    <button id="comment-submit" class="px-4 py-2 rounded-lg bg-[var(--primary)] text-white font-bold hover:opacity-80 transition-opacity">发送喵~</button>
+                </div>
+            </div>
+            <script>
+                // 加载评论区脚本
+                async function loadComments() {
+                    try {
+                        const res = await fetch('http://' + window.location.hostname + ':8000/api/comments');
+                        const comments = await res.json();
+                        const list = document.getElementById('comment-list');
+                        list.innerHTML = comments.map(c => `
+                            <div class="p-4 rounded-xl bg-[var(--card-bg)]">
+                                <div class="font-bold text-sm opacity-70">\${c.name}</div>
+                                <div class="mt-1">\${c.content}</div>
+                                <div class="text-xs opacity-50 mt-1">\${new Date(c.created_at).toLocaleString()}</div>
+                            </div>
+                        `).join('');
+                    } catch(e) { /* backend not available */ }
+                }
+                document.getElementById('comment-submit')?.addEventListener('click', async () => {
+                    const name = document.getElementById('comment-name').value || '匿名';
+                    const content = document.getElementById('comment-content').value;
+                    if (!content) return;
+                    try {
+                        await fetch('http://' + window.location.hostname + ':8000/api/comments', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name, content })
+                        });
+                        document.getElementById('comment-content').value = '';
+                        loadComments();
+                    } catch(e) { alert('评论发送失败啦~ 后端是不是还没启动呀喵？'); }
+                });
+                loadComments();
+            </script>
+        </div>
+    </div>
+</MainGridLayout>
